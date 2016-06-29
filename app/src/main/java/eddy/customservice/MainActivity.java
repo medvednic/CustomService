@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
+import android.util.Patterns;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -21,81 +22,91 @@ import butterknife.OnClick;
 
 public class MainActivity extends AppCompatActivity {
 
-    @Bind(R.id.tvTitle)
-    TextView tvTitle;
+    private String user;
+    private SharedPreferences users;
     @Bind(R.id.tvEmail)
     TextView tvEmail;
     @Bind(R.id.etEmail)
     EditText etEmail;
     @Bind(R.id.btRegister)
     Button btRegister;
-    String user;
+    @Bind(R.id.btCancel)
+    Button btCancel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
+        users = getSharedPreferences("RegisteredUser", Context.MODE_PRIVATE);
+        promptUser();
         //hide views if registered user exists
-        if (checkRegistration()){
+        if (checkRegistration()) {
             tvEmail.setVisibility(View.INVISIBLE);
             etEmail.setVisibility(View.INVISIBLE);
             btRegister.setVisibility(View.INVISIBLE);
             Toast.makeText(this, user, Toast.LENGTH_LONG).show();
         }
+        else { //hide cancel button from unregistered user
+            btCancel.setEnabled(false);
+        }
+    }
 
-        //temp logout method for testing only!
-        tvTitle.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                SharedPreferences users = getSharedPreferences("RegisteredUser", Context.MODE_PRIVATE);
-                SharedPreferences.Editor editor = users.edit();
-                editor.remove("emailAddress");
-                editor.apply();
-                Toast.makeText(getApplicationContext(), "deleted user", Toast.LENGTH_SHORT).show();
-                tvEmail.setVisibility(View.VISIBLE);
-                etEmail.setVisibility(View.VISIBLE);
-                btRegister.setVisibility(View.VISIBLE);
-                etEmail.setEnabled(true);
-                btRegister.setEnabled(true);
+    private void promptUser() { //SDK 23 and above require user approval for drawing overlays
+        if (Build.VERSION.SDK_INT >= 23) {
+            if (!Settings.canDrawOverlays(MainActivity.this)) {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + getPackageName()));
+                startActivityForResult(intent, 1234);
             }
-        });
+        }
     }
 
     private boolean checkRegistration() { //get email address from shared preferences
-        SharedPreferences users = getSharedPreferences("RegisteredUser", Context.MODE_PRIVATE);
         user = users.getString("emailAddress", "");
         return !user.equals("");
     }
 
-    @OnClick(R.id.btRegister)
-    public void onClick() {
-        //locally save valid email address
-        SharedPreferences users = getSharedPreferences("RegisteredUser", Context.MODE_PRIVATE);
+    //handle button actions
+    @OnClick({R.id.btRegister, R.id.btCancel})
+    public void onClick(View view) {
         SharedPreferences.Editor editor = users.edit();
-        if (validate(etEmail.getText())){
-            editor.putString("emailAddress", etEmail.getText().toString());
-            editor.apply();
-            if(Build.VERSION.SDK_INT >= 23) {
-                if (!Settings.canDrawOverlays(MainActivity.this)) {
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:" + getPackageName()));
-                    startActivityForResult(intent, 1234);
-                }
-                else
-                {
+        switch (view.getId()) {
+            case R.id.btRegister:
+                //locally save valid email address
+                if (validate(etEmail.getText())) {
+                    editor.putString("emailAddress", etEmail.getText().toString());
+                    editor.apply();
                     Intent intent = new Intent(this, MenuService.class);
                     startService(intent);
+                    etEmail.setEnabled(false);
+                    btRegister.setEnabled(false);
+                    btCancel.setEnabled(true);
                 }
-            }
-            etEmail.setEnabled(false);
-            btRegister.setEnabled(false);
-
+                else {
+                    Toast.makeText(getApplicationContext(), "Enter valid address", Toast.LENGTH_SHORT).show();
+                }
+                break;
+            case R.id.btCancel:
+                //logout and stop running service
+                editor.remove("emailAddress");
+                editor.apply();
+                Intent intent = new Intent(getApplicationContext(), MenuService.class);
+                stopService(intent);
+                Toast.makeText(getApplicationContext(), "Service Stopped", Toast.LENGTH_LONG).show();
+                tvEmail.setVisibility(View.VISIBLE);
+                etEmail.setVisibility(View.VISIBLE);
+                btRegister.setVisibility(View.VISIBLE);
+                etEmail.setEnabled(true);
+                etEmail.setText("");
+                btRegister.setEnabled(true);
+                btCancel.setEnabled(false);
+                break;
         }
     }
 
     private boolean validate(CharSequence input) {
         //validate email address
-        return !TextUtils.isEmpty(input) && android.util.Patterns.EMAIL_ADDRESS.matcher(input).matches();
+        return !TextUtils.isEmpty(input) && Patterns.EMAIL_ADDRESS.matcher(input).matches();
     }
 }
