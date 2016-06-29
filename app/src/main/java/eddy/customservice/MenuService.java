@@ -14,7 +14,7 @@ import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 /**
- * Created by Eddy medvednic on 6/29/16.
+ * Created by Eddy Medvednic on 6/29/16.
  */
 
 public class MenuService extends Service {
