@@ -1,11 +1,13 @@
 package eddy.customservice;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
-import android.renderscript.ScriptGroup;
+import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
-import android.text.InputType;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
@@ -74,9 +76,21 @@ public class MainActivity extends AppCompatActivity {
         if (validate(etEmail.getText())){
             editor.putString("emailAddress", etEmail.getText().toString());
             editor.apply();
-            Toast.makeText(this, "Registration successful!", Toast.LENGTH_SHORT).show();
+            if(Build.VERSION.SDK_INT >= 23) {
+                if (!Settings.canDrawOverlays(MainActivity.this)) {
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:" + getPackageName()));
+                    startActivityForResult(intent, 1234);
+                }
+                else
+                {
+                    Intent intent = new Intent(this, MenuService.class);
+                    startService(intent);
+                }
+            }
             etEmail.setEnabled(false);
             btRegister.setEnabled(false);
+
         }
     }
 
